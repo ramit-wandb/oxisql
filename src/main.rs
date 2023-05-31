@@ -1,4 +1,4 @@
-use std::{pin::Pin, future::Future};
+use std::{pin::Pin, future::Future, collections::HashMap};
 use sqlx::{MySqlConnection, Connection, Row, Column};
 use futures::StreamExt;
 use std::io::Write;
@@ -65,10 +65,23 @@ impl MySqlArgs {
     }
 }
 
+const HELP: &str = "Usage: oxisql -h <host> -P <port> -u <user> -p <password> -D <database> [-e <query>]";
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        println!("{HELP}");
+        return;
+    }
+
     let mysql_args: MySqlArgs = MySqlArgs::parse_args(args);
+
+    if mysql_args.host == "" || mysql_args.port == 0 || mysql_args.user == "" || mysql_args.password == "" || mysql_args.database == "" {
+        println!("{HELP}");
+        return;
+    }
 
     let connection : Pin<Box<dyn Future<Output = Result<MySqlConnection, sqlx::Error>>>> = MySqlConnection::connect(
         format!(
@@ -85,36 +98,109 @@ async fn main() {
     run_mysql_session(connection, mysql_args).await;
 }
 
+#[derive(Debug)]
+struct MySqlQueryResult {
+    columns: Vec<String>,
+    values: HashMap<String, Vec<String>>
+}
+
+impl MySqlQueryResult {
+    fn new() -> MySqlQueryResult {
+        MySqlQueryResult {
+            columns: Vec::new(),
+            values: HashMap::new()
+        }
+    }
+
+    async fn parse_query(query: String,connection: &mut MySqlConnection) -> Result<MySqlQueryResult, sqlx::Error> {
+        let mut result = MySqlQueryResult::new();
+
+        let mut rows = sqlx::query(query.as_str()).fetch(connection);
+        let mut columns_read = false;
+
+        while let Some(row) = rows.next().await {
+            let row = row?;
+            if !columns_read {
+                result.columns = row.columns().iter()
+                    .map(|c| c.name())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>(); 
+                columns_read = true;
+            }
+
+            for column_name in &result.columns {
+                let resp = row.try_get(&column_name as &str);
+                let values = result.values.entry(column_name.clone()).or_insert(Vec::new());
+                match resp {
+                    Ok(value) => {
+                        values.push(value);
+                    },
+                    Err(_) => {
+                        values.push(String::from("NULL"));
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+}
+
 async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArgs) {
     let interactive = mysql_args.execute.is_none();
 
     if interactive {
         loop {
-            print!("mysql> ");
-            // Flush stdout so that the prompt is printed
+            print!("oxisql> ");
             std::io::stdout().flush().unwrap();
+
             let mut input = String::new();
             std::io::stdin().read_line(&mut input).unwrap();
             let input = input.trim();
-            if input == "exit" {
+            if input == "exit" || input == "quit" {
                 break;
             }
-            let mut rows = sqlx::query(input).fetch(&mut connection);
-            while let Some(row) = rows.next().await {
-                let row = row.expect("Could not fetch row");
-                let column_names = row.columns().iter().map(|c| c.name()).collect::<Vec<_>>(); 
-                for column_name in column_names {
-                    let resp : Result<String, sqlx::Error>= row.try_get(column_name);
-                    match resp {
-                        Ok(value) => print!("{} : {}\n", column_name, value),
-                        Err(_) => print!("{} : NULL\n", column_name)
-                    }
-                } 
-                println!();
+
+            let result = MySqlQueryResult::parse_query(input.to_string(), &mut connection).await;
+
+            match result {
+                Ok(value) => { 
+                    println!("{}", format_result(value));
+                },
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
             }
         }
     } else {
-        todo!("Non-interactive mode not implemented yet");
+        let result = MySqlQueryResult::parse_query(mysql_args.execute.unwrap(), &mut connection).await;
+        match result {
+            Ok(value) => { 
+                println!("{}", format_result(value));
+            },
+            Err(e) => {
+                println!("Error: {}", e);
+            }
+        }
+    }
+}
+
+fn format_result(result: MySqlQueryResult) -> String {
+    let mut output = String::new();
+
+    for column in &result.columns {
+        output.push_str(column.as_str());
+        output.push_str("\t");
+    }
+    output.push_str("\n");
+
+    for column_name in &result.columns {
+        let column = result.values.get(column_name).unwrap();
+        for value in column {
+            output.push_str(value.as_str());
+            output.push_str("\t");
+        }
     }
 
+    output
 }
