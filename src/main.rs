@@ -5,6 +5,9 @@ use std::io::Write;
 mod connector;
 use connector::MySqlQueryResult;
 
+mod formatter;
+use formatter::print_table;
+
 #[derive(Debug)]
 struct MySqlArgs {
     host: String,
@@ -144,56 +147,4 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
             }
         }
     }
-}
-
-fn print_table(result: &MySqlQueryResult) {
-    let mut max_lengths = result.headers.iter().map(|s| s.len()).collect::<Vec<usize>>();
-
-    for row in &result.values {
-        for (i, column_name) in result.headers.iter().enumerate() {
-            let column = row.get(column_name).unwrap();
-            max_lengths[i] = max_lengths[i].max(column.len());
-        }
-    }
-
-    let mut sum_lengths: usize = max_lengths.iter().sum();
-    sum_lengths += max_lengths.len() * 3 - 1;
-
-    // Print separator
-    print!("+");
-    for _ in 0..sum_lengths {
-        print!("-");
-    }
-    println!("+");
-
-    // Print headers
-    print!("| ");
-    for (header, max_length) in result.headers.iter().zip(max_lengths.iter()) {
-        print!("{:<width$} | ", header, width = max_length);
-    }
-    println!();
-
-     // Print separator
-    print!("+");
-    for _ in 0..sum_lengths {
-        print!("-");
-    }
-    println!("+"); 
-
-    // Print rows
-    for row in &result.values {
-        print!("| ");
-        for (i, column_name) in result.headers.iter().enumerate() {
-            let column = row.get(column_name).unwrap();
-            print!("{:<width$} | ", column, width = max_lengths[i]);
-        }
-        println!();
-    }
-
-   // Print separator
-    print!("+");
-    for _ in 0..sum_lengths {
-        print!("-");
-    }
-    println!("+"); 
 }
