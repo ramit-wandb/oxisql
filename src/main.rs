@@ -98,7 +98,7 @@ async fn main() {
             mysql_args.database
         ).as_str()
     ); 
-    let connection = connection.await.expect("Could not connect to database");
+    let connection : MySqlConnection = connection.await.expect("Could not connect to database");
 
     run_mysql_session(connection, mysql_args).await;
 }
@@ -147,4 +147,6 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
             }
         }
     }
+
+    connection.close().await.expect("Could not close connection");
 }

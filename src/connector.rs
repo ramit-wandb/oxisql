@@ -9,13 +9,16 @@ pub struct MySqlQueryResult {
     pub values: Vec<HashMap<String, String>>
 }
 
-fn handle_result<T: ToString + sqlx::Type<MySql>>(value: Result<Option<T>, sqlx::Error>) -> String {
+fn handle_result<T>(value: Result<Option<T>, sqlx::Error>) -> String where T: ToString + sqlx::Type<MySql> {
     match value {
         Ok(value) => match value {
             Some(value) => value.to_string(),
             None => String::from("NULL")
         },
-        Err(_) => String::from("NULL")
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            String::from("ERR")
+        }
     }
 }
 
@@ -38,41 +41,40 @@ impl MySqlQueryResult {
 
         for row in rows {
             let mut row_values = HashMap::new();
-            for column in &result.headers {
-                let column = column.as_str();
-                let value : &MySqlColumn = row.column(column);
-
+            for column in row.columns() {
+                let value : &MySqlColumn = column.into();
+                let column_idx = column.name();
                 let value_str = match value.type_info().name() {
-                    "BOOLEAN" => handle_result::<bool>(row.try_get(column)),
-                    "TINYINT" => handle_result::<i8>(row.try_get(column)),
-                    "SMALLINT" => handle_result::<i16>(row.try_get(column)), 
-                    "INT" => handle_result::<i32>(row.try_get(column)),
-                    "BIGINT" => handle_result::<i64>(row.try_get(column)),
-                    "TINYINT UNSIGNED" => handle_result::<u8>(row.try_get(column)),
-                    "SMALLINT UNSIGNED" => handle_result::<u16>(row.try_get(column)),
-                    "INT UNSIGNED" => handle_result::<u32>(row.try_get(column)),
-                    "BIGINT UNSIGNED" => handle_result::<u64>(row.try_get(column)),
-                    "FLOAT" => handle_result::<f32>(row.try_get(column)),
-                    "DOUBLE" => handle_result::<f64>(row.try_get(column)),
-                    "VARCHAR" | "CHAR" | "TEXT" => handle_result::<String>(row.try_get(column)),
+                    "BOOLEAN" => handle_result::<bool>(row.try_get(column_idx)),
+                    "TINYINT" => handle_result::<i8>(row.try_get(column_idx)),
+                    "SMALLINT" => handle_result::<i16>(row.try_get(column_idx)), 
+                    "INT" => handle_result::<i32>(row.try_get(column_idx)),
+                    "BIGINT" => handle_result::<i64>(row.try_get(column_idx)),
+                    "TINYINT UNSIGNED" => handle_result::<u8>(row.try_get(column_idx)),
+                    "SMALLINT UNSIGNED" => handle_result::<u16>(row.try_get(column_idx)),
+                    "INT UNSIGNED" => handle_result::<u32>(row.try_get(column_idx)),
+                    "BIGINT UNSIGNED" => handle_result::<u64>(row.try_get(column_idx)),
+                    "FLOAT" => handle_result::<f32>(row.try_get(column_idx)),
+                    "DOUBLE" => handle_result::<f64>(row.try_get(column_idx)),
+                    "VARCHAR" | "CHAR" | "TEXT" => handle_result::<String>(row.try_get(column_idx)),
                     "VARBINARY" | "BINARY" | "BLOB" => {
-                        let value : Result<Option<Vec<u8>>, sqlx::Error> = row.try_get(column);
+                        let value : Result<Option<Vec<u8>>, sqlx::Error> = row.try_get(column_idx);
                         match value {
                             Ok(value) => match value {
                                 Some(value) => format!("{:?}", value),
                                 None => String::from("NULL")
                             } 
-                            Err(_) => String::from("NULL")
+                            Err(_) => String::from("ERR")
                         }
                     },
-                    "DATETIME" => handle_result::<NaiveDateTime>(row.try_get(column)),
-                    "DATE" => handle_result::<NaiveDate>(row.try_get(column)),
-                    "TIME" => handle_result::<NaiveTime>(row.try_get(column)),
-                    "TIMESTAMP" => handle_result::<DateTime<Utc>>(row.try_get(column)),
-                    "JSON" => handle_result::<serde_json::Value>(row.try_get(column)),
+                    "DATETIME" => handle_result::<NaiveDateTime>(row.try_get(column_idx)),
+                    "DATE" => handle_result::<NaiveDate>(row.try_get(column_idx)),
+                    "TIME" => handle_result::<NaiveTime>(row.try_get(column_idx)),
+                    "TIMESTAMP" => handle_result::<DateTime<Utc>>(row.try_get(column_idx)),
+                    "JSON" => handle_result::<serde_json::Value>(row.try_get(column_idx)),
                     _ => "NULL".to_string()
                 };
-                row_values.insert(column.to_string(), value_str);
+                row_values.insert(column_idx.to_string(), value_str);
             }
             result.values.push(row_values);
         }
