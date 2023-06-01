@@ -1,6 +1,7 @@
 use std::{pin::Pin, future::Future, collections::HashMap};
+use sqlx::mysql::MySqlColumn;
 use sqlx::{MySqlConnection, Connection, Row, Column};
-use futures::StreamExt;
+use sqlx::TypeInfo;
 use std::io::Write;
 
 #[derive(Debug)]
@@ -101,45 +102,134 @@ async fn main() {
 #[derive(Debug)]
 struct MySqlQueryResult {
     columns: Vec<String>,
-    values: HashMap<String, Vec<String>>
+    values: Vec<HashMap<String, String>>
 }
 
 impl MySqlQueryResult {
     fn new() -> MySqlQueryResult {
         MySqlQueryResult {
             columns: Vec::new(),
-            values: HashMap::new()
+            values: Vec::new()
         }
     }
 
-    async fn parse_query(query: String,connection: &mut MySqlConnection) -> Result<MySqlQueryResult, sqlx::Error> {
+    async fn parse_query(query: String, connection: &mut MySqlConnection) -> Result<MySqlQueryResult, sqlx::Error> {
         let mut result = MySqlQueryResult::new();
 
-        let mut rows = sqlx::query(query.as_str()).fetch(connection);
-        let mut columns_read = false;
+        let rows = sqlx::query(query.as_str()).fetch_all(connection).await?;
 
-        while let Some(row) = rows.next().await {
-            let row = row?;
-            if !columns_read {
-                result.columns = row.columns().iter()
-                    .map(|c| c.name())
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>(); 
-                columns_read = true;
-            }
+        if let Some(first_row) = rows.first() {
+            result.columns = first_row.columns().iter().map(|c| c.name().to_string()).collect();
+        }
 
-            for column_name in &result.columns {
-                let resp = row.try_get(&column_name as &str);
-                let values = result.values.entry(column_name.clone()).or_insert(Vec::new());
-                match resp {
-                    Ok(value) => {
-                        values.push(value);
+        for row in rows {
+            let mut row_values = HashMap::new();
+
+            for column in &result.columns {
+                let column = column.as_str();
+                let value : &MySqlColumn = row.column(column);
+                let value_str = match value.type_info().name() {
+                    "BOOLEAN" => {
+                        let value : Result<bool, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
                     },
-                    Err(_) => {
-                        values.push(String::from("NULL"));
+                    "TINYINT" => {
+                        let value : Result<i8, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "SMALLINT" => {
+                        let value : Result<i16, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "INT" => {
+                        let value : Result<i32, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "BIGINT" => {
+                        let value : Result<i64, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "TINYINT UNSIGNED" => {
+                        let value : Result<u8, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "SMALLINT UNSIGNED" => {
+                        let value : Result<u16, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "INT UNSIGNED" => {
+                        let value : Result<u32, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "BIGINT UNSIGNED" => {
+                        let value : Result<u64, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "FLOAT" => {
+                        let value: Result<f32, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "DOUBLE" => {
+                        let value: Result<f64, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value.to_string(),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "VARCHAR" | "CHAR" | "TEXT" => {
+                        let value : Result<String, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => value,
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    "VARBINARY" | "BINARY" | "BLOB" => {
+                        let value : Result<Vec<u8>, sqlx::Error> = row.try_get(column);
+                        match value {
+                            Ok(value) => format!("{:?}", value),
+                            Err(_) => String::from("NULL")
+                        }
+                    },
+                    // TODO: DATE, TIME, DATEIME, TIMESTAMP, JSON
+                    _ => {
+                        "NULL".to_string()
                     }
-                }
+                };
+
+                row_values.insert(column.to_string(), value_str);
             }
+
+            result.values.push(row_values);
         }
 
         Ok(result)
@@ -159,6 +249,12 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
             let input = input.trim();
             if input == "exit" || input == "quit" {
                 break;
+            }
+
+            if input == "clear" {
+                let mut stdout = std::io::stdout();
+                stdout.write("\x1B[2J\x1B[1;1H".as_bytes()).unwrap();
+                continue;
             }
 
             let result = MySqlQueryResult::parse_query(input.to_string(), &mut connection).await;
@@ -192,14 +288,22 @@ fn format_result(result: MySqlQueryResult) -> String {
         output.push_str(column.as_str());
         output.push_str("\t");
     }
+    let size = output.len();
+
+    // Place a line under the column names
+    output.push_str("\n");
+    for _ in 0..size {
+        output.push_str("-");
+    }
     output.push_str("\n");
 
-    for column_name in &result.columns {
-        let column = result.values.get(column_name).unwrap();
-        for value in column {
-            output.push_str(value.as_str());
+    for row in &result.values {
+        for column_name in &result.columns {
+            let column = row.get(column_name).unwrap();
+            output.push_str(column.as_str());
             output.push_str("\t");
         }
+        output.push_str("\n");
     }
 
     output
