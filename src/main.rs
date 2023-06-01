@@ -126,50 +126,74 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
 
             match result {
                 Ok(value) => { 
-                    println!("{}", format_result(value));
+                    print_table(&value);
                 },
                 Err(e) => {
-                    println!("Error: {}", e);
+                    eprintln!("Error: {}", e);
                 }
             }
         }
     } else {
         let result = MySqlQueryResult::parse_query(mysql_args.execute.unwrap(), &mut connection).await;
         match result {
-            Ok(value) => { 
-                println!("{}", format_result(value));
+            Ok(value) => {
+                print_table(&value)
             },
             Err(e) => {
-                println!("Error: {}", e);
+                eprintln!("Error: {}", e);
             }
         }
     }
 }
 
-fn format_result(result: MySqlQueryResult) -> String {
-    let mut output = String::new();
-
-    for column in &result.columns {
-        output.push_str(column.as_str());
-        output.push_str("\t");
-    }
-    let size = output.len();
-
-    // Place a line under the column names
-    output.push_str("\n");
-    for _ in 0..size {
-        output.push_str("-");
-    }
-    output.push_str("\n");
+fn print_table(result: &MySqlQueryResult) {
+    let mut max_lengths = result.headers.iter().map(|s| s.len()).collect::<Vec<usize>>();
 
     for row in &result.values {
-        for column_name in &result.columns {
+        for (i, column_name) in result.headers.iter().enumerate() {
             let column = row.get(column_name).unwrap();
-            output.push_str(column.as_str());
-            output.push_str("\t");
+            max_lengths[i] = max_lengths[i].max(column.len());
         }
-        output.push_str("\n");
     }
 
-    output
+    let mut sum_lengths: usize = max_lengths.iter().sum();
+    sum_lengths += max_lengths.len() * 3 - 1;
+
+    // Print separator
+    print!("+");
+    for _ in 0..sum_lengths {
+        print!("-");
+    }
+    println!("+");
+
+    // Print headers
+    print!("| ");
+    for (header, max_length) in result.headers.iter().zip(max_lengths.iter()) {
+        print!("{:<width$} | ", header, width = max_length);
+    }
+    println!();
+
+     // Print separator
+    print!("+");
+    for _ in 0..sum_lengths {
+        print!("-");
+    }
+    println!("+"); 
+
+    // Print rows
+    for row in &result.values {
+        print!("| ");
+        for (i, column_name) in result.headers.iter().enumerate() {
+            let column = row.get(column_name).unwrap();
+            print!("{:<width$} | ", column, width = max_lengths[i]);
+        }
+        println!();
+    }
+
+   // Print separator
+    print!("+");
+    for _ in 0..sum_lengths {
+        print!("-");
+    }
+    println!("+"); 
 }

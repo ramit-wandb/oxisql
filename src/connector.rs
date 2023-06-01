@@ -5,7 +5,7 @@ use chrono::{NaiveDateTime, NaiveDate, NaiveTime, DateTime, Utc};
 
 #[derive(Debug)]
 pub struct MySqlQueryResult {
-    pub columns: Vec<String>,
+    pub headers: Vec<String>,
     pub values: Vec<HashMap<String, String>>
 }
 
@@ -22,7 +22,7 @@ fn handle_result<T: ToString + sqlx::Type<MySql>>(value: Result<Option<T>, sqlx:
 impl MySqlQueryResult {
     fn new() -> MySqlQueryResult {
         MySqlQueryResult {
-            columns: Vec::new(),
+            headers: Vec::new(),
             values: Vec::new()
         }
     } 
@@ -33,12 +33,12 @@ impl MySqlQueryResult {
         let rows = sqlx::query(query.as_str()).fetch_all(connection).await?;
 
         if let Some(first_row) = rows.first() {
-            result.columns = first_row.columns().iter().map(|c| c.name().to_string()).collect();
+            result.headers = first_row.columns().iter().map(|c| c.name().to_string()).collect();
         }
 
         for row in rows {
             let mut row_values = HashMap::new();
-            for column in &result.columns {
+            for column in &result.headers {
                 let column = column.as_str();
                 let value : &MySqlColumn = row.column(column);
 
