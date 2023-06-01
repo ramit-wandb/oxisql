@@ -1,8 +1,9 @@
-use std::{pin::Pin, future::Future, collections::HashMap};
-use sqlx::mysql::MySqlColumn;
-use sqlx::{MySqlConnection, Connection, Row, Column};
-use sqlx::TypeInfo;
+use std::{pin::Pin, future::Future};
+use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
+
+mod connector;
+use connector::MySqlQueryResult;
 
 #[derive(Debug)]
 struct MySqlArgs {
@@ -99,142 +100,6 @@ async fn main() {
     run_mysql_session(connection, mysql_args).await;
 }
 
-#[derive(Debug)]
-struct MySqlQueryResult {
-    columns: Vec<String>,
-    values: Vec<HashMap<String, String>>
-}
-
-impl MySqlQueryResult {
-    fn new() -> MySqlQueryResult {
-        MySqlQueryResult {
-            columns: Vec::new(),
-            values: Vec::new()
-        }
-    }
-
-    async fn parse_query(query: String, connection: &mut MySqlConnection) -> Result<MySqlQueryResult, sqlx::Error> {
-        let mut result = MySqlQueryResult::new();
-
-        let rows = sqlx::query(query.as_str()).fetch_all(connection).await?;
-
-        if let Some(first_row) = rows.first() {
-            result.columns = first_row.columns().iter().map(|c| c.name().to_string()).collect();
-        }
-
-        for row in rows {
-            let mut row_values = HashMap::new();
-
-            for column in &result.columns {
-                let column = column.as_str();
-                let value : &MySqlColumn = row.column(column);
-                let value_str = match value.type_info().name() {
-                    "BOOLEAN" => {
-                        let value : Result<bool, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "TINYINT" => {
-                        let value : Result<i8, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "SMALLINT" => {
-                        let value : Result<i16, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "INT" => {
-                        let value : Result<i32, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "BIGINT" => {
-                        let value : Result<i64, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "TINYINT UNSIGNED" => {
-                        let value : Result<u8, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "SMALLINT UNSIGNED" => {
-                        let value : Result<u16, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "INT UNSIGNED" => {
-                        let value : Result<u32, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "BIGINT UNSIGNED" => {
-                        let value : Result<u64, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "FLOAT" => {
-                        let value: Result<f32, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "DOUBLE" => {
-                        let value: Result<f64, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value.to_string(),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "VARCHAR" | "CHAR" | "TEXT" => {
-                        let value : Result<String, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => value,
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    "VARBINARY" | "BINARY" | "BLOB" => {
-                        let value : Result<Vec<u8>, sqlx::Error> = row.try_get(column);
-                        match value {
-                            Ok(value) => format!("{:?}", value),
-                            Err(_) => String::from("NULL")
-                        }
-                    },
-                    // TODO: DATE, TIME, DATEIME, TIMESTAMP, JSON
-                    _ => {
-                        "NULL".to_string()
-                    }
-                };
-
-                row_values.insert(column.to_string(), value_str);
-            }
-
-            result.values.push(row_values);
-        }
-
-        Ok(result)
-    }
-}
 
 async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArgs) {
     let interactive = mysql_args.execute.is_none();
