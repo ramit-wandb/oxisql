@@ -2,7 +2,7 @@ use std::{pin::Pin, future::Future};
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
 use console::Term;
-use console::Key::{Char, Backspace, Enter, ArrowUp};
+use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown};
 
 mod connector;
 use connector::MySqlQueryResult;
@@ -123,35 +123,78 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
 
             let mut pressed_key: console::Key;
             let mut input = String::new();
+            let mut command_offset : usize = 0;
+            let mut commands : Vec<String> = command_trie.search_all(input.as_str()).clone();
 
             loop {
                 pressed_key = term.read_key().unwrap();
 
                 match pressed_key {
                     Backspace  => {
-                        term.write_str("\u{08} \u{08}").unwrap();
                         input.pop();
+                        commands = command_trie.search_all(input.as_str()).clone();
+                        term.clear_line().unwrap();
+                        term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                     },
                     Enter => {
                         if input.chars().last() == Some(';') {
                             break
                         } else {
+                            term.clear_line().unwrap();
                             term.write_str("\n{PROMPT}").unwrap();
                         }
                     },
                     ArrowUp => {
-                        let last_command = command_trie.search_all(input.as_str()).iter().last().unwrap().clone();
-                        if last_command.len() > 0 {
-                            input = last_command;
+                        if commands.len() == 0 {
+                            continue;
+                        }
+                        if command_offset != commands.len() {
+                            command_offset += 1;
+                        }
+
+                        let found_command = commands.get(commands.len() - command_offset).unwrap();
+                            
+                        if found_command.len() > 0 {
+                            input = found_command.clone();
+                            term.clear_line().unwrap();
+                            term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+                        }
+                    },
+                    ArrowDown => {
+                        if commands.len() == 0 {
+                            continue;
+                        }
+                        if command_offset >= 1 {
+                            command_offset -= 1;
+                        }
+
+                        if command_offset == 0 {
+                            input = String::new();
+                            commands = command_trie.search_all(input.as_str()).clone();
+                            term.clear_line().unwrap();
+                            term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+                            continue;
+                        }
+
+                        let found_command = commands.get(commands.len() - command_offset).unwrap();
+                            
+                        if found_command.len() > 0 {
+                            input = found_command.clone();
+                            term.clear_line().unwrap();
                             term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                         }
                     }
-                    Char(c) => input.push(c),
+                    Char(c) => {
+                        input.push(c);
+                        commands = command_trie.search_all(input.as_str()).clone();
+                        command_offset = 0;
+                    },
                     _ => {
-                        println!("Unknown key: {:?}", pressed_key);
+                        eprintln!("Unknown key: {:?}", pressed_key);
                     }
                 }
 
+                term.clear_line().unwrap();
                 term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
             }
 
