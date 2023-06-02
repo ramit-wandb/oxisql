@@ -146,11 +146,8 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                     },
                     Enter => {
                         if input.chars().last() == Some(';') {
-                            break
-                        } else {
-                            term.clear_line().unwrap();
-                            term.write_str("\n{PROMPT}").unwrap();
-                        }
+                            break;
+                        } 
                     },
                     ArrowUp => {
                         if commands.len() == 0 {
@@ -212,8 +209,6 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                     }
                 }
 
-                // TODO Clearing line is a little wonky 
-                // when input does not end with ;, it just moved everything to a new line
                 term.clear_line().unwrap();
                 term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                 term.move_cursor_left(input.len() - cursor).unwrap();
