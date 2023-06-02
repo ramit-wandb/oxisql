@@ -1,42 +1,47 @@
+use std::collections::HashMap;
 
-const TRIE_SIZE: usize = 256;
-
-struct Trie {
-    children: [Option<Box<Trie>>; TRIE_SIZE],
+#[derive(Debug)]
+pub struct Trie {
+    children: HashMap<char, Trie>,
     word: Option<String>
 }
 
 impl Trie {
-    fn new() -> Trie {
+    pub fn new() -> Trie {
         Trie {
-            children: [None; TRIE_SIZE],
+            children: HashMap::new(),
             word: None
         }
     }
 
-    fn insert(&mut self, word: &str) {
+    pub fn insert(&mut self, word: &str) {
         let mut node = self;
         for c in word.chars() {
-            let idx = c as u8 as usize;
-            if node.children[idx].is_none() {
-                node.children[idx] = Some(Box::new(Trie::new()));
-            }
-            node = node.children[idx].as_mut().unwrap();
+            node = node.children.entry(c).or_insert(Trie::new());
         }
         node.word = Some(word.to_string());
     }
 
-    fn search_all(&self, prefix: &str) -> Vec<String> {
+    pub fn search_all(&self, prefix: &str) -> Vec<String> {
         let mut node = self;
         for c in prefix.chars() {
-            let idx = c as u8 as usize;
-            if node.children[idx].is_none() {
+            if let Some(child) = node.children.get(&c) {
+                node = child;
+            } else {
                 return vec![];
             }
-            node = node.children[idx].as_ref().unwrap();
         }
         let mut words = vec![];
-        node.search(&mut words);
+        node.traverse(&mut words);
         words
+    }
+
+    pub fn traverse(&self, words: &mut Vec<String>) {
+        if let Some(word) = &self.word {
+            words.push(word.clone());
+        }
+        for child in self.children.values() {
+            child.traverse(words);
+        }
     }
 }

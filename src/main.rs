@@ -1,12 +1,17 @@
 use std::{pin::Pin, future::Future};
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
+use console::Term;
+use console::Key::{Char, Backspace, Enter, ArrowUp};
 
 mod connector;
 use connector::MySqlQueryResult;
 
 mod formatter;
 use formatter::print_table;
+
+mod trie;
+use trie::Trie;
 
 #[derive(Debug)]
 struct MySqlArgs {
@@ -106,25 +111,64 @@ async fn main() {
 
 async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArgs) {
     let interactive = mysql_args.execute.is_none();
+    let mut command_trie = Trie::new();
+
+    const PROMPT: &str = "oxisql> ";
+    let term : Term = Term::stdout();
 
     if interactive {
         loop {
-            print!("oxisql> ");
+            print!("{PROMPT}");
             std::io::stdout().flush().unwrap();
 
+            let mut pressed_key: console::Key;
             let mut input = String::new();
-            std::io::stdin().read_line(&mut input).unwrap();
+
+            loop {
+                pressed_key = term.read_key().unwrap();
+
+                match pressed_key {
+                    Backspace  => {
+                        term.write_str("\u{08} \u{08}").unwrap();
+                        input.pop();
+                    },
+                    Enter => {
+                        if input.chars().last() == Some(';') {
+                            break
+                        } else {
+                            term.write_str("\n{PROMPT}").unwrap();
+                        }
+                    },
+                    ArrowUp => {
+                        let last_command = command_trie.search_all(input.as_str()).iter().last().unwrap().clone();
+                        if last_command.len() > 0 {
+                            input = last_command;
+                            term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+                        }
+                    }
+                    Char(c) => input.push(c),
+                    _ => {
+                        println!("Unknown key: {:?}", pressed_key);
+                    }
+                }
+
+                term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+            }
+
+            println!();
+
             let input = input.trim();
-            if input == "exit" || input == "quit" {
+            if input == "exit;" || input == "quit;" {
                 break;
             }
 
-            if input == "clear" {
+            if input == "clear;" {
                 let mut stdout = std::io::stdout();
                 stdout.write("\x1B[2J\x1B[1;1H".as_bytes()).unwrap();
                 continue;
             }
 
+            command_trie.insert(input.clone());
             let result = MySqlQueryResult::parse_query(input.to_string(), &mut connection).await;
 
             match result {

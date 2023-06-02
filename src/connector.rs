@@ -43,7 +43,8 @@ impl MySqlQueryResult {
             let mut row_values = HashMap::new();
             for column in row.columns() {
                 let value : &MySqlColumn = column.into();
-                let column_idx = column.name();
+                let column_idx = column.name(); // ordinal() will fix the show full processlist
+                                                // bug, but better to fix it within mysql itself
                 let value_str = match value.type_info().name() {
                     "BOOLEAN" => handle_result::<bool>(row.try_get(column_idx)),
                     "TINYINT" => handle_result::<i8>(row.try_get(column_idx)),
