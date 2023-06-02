@@ -2,7 +2,7 @@ use std::{pin::Pin, future::Future};
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
 use console::Term;
-use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown};
+use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight};
 
 mod connector;
 use connector::MySqlQueryResult;
@@ -37,6 +37,8 @@ impl MySqlArgs {
 
     fn parse_args(args: Vec<String>) -> MySqlArgs {
         let mut opts = MySqlArgs::new();
+
+        // TODO Parse args with clap
         let mut i = 1;
         while i < args.len() {
             match args[i].as_str() {
@@ -124,15 +126,21 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
             let mut pressed_key: console::Key;
             let mut input = String::new();
             let mut command_offset : usize = 0;
-            let mut commands : Vec<String> = command_trie.search_all(input.as_str()).clone();
+            let mut commands : Vec<String> = command_trie.search_all(input.as_str());
+            let mut cursor : usize = 0;
 
             loop {
                 pressed_key = term.read_key().unwrap();
 
                 match pressed_key {
                     Backspace  => {
-                        input.pop();
-                        commands = command_trie.search_all(input.as_str()).clone();
+                        if cursor > 0 {
+                            cursor -= 1;
+                            input.remove(cursor);
+                            term.clear_line().unwrap();
+                            term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+                        }
+                        commands = command_trie.search_all(input.as_str());
                         term.clear_line().unwrap();
                         term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                     },
@@ -156,6 +164,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                             
                         if found_command.len() > 0 {
                             input = found_command.clone();
+                            cursor = input.len();
                             term.clear_line().unwrap();
                             term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                         }
@@ -170,7 +179,8 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
 
                         if command_offset == 0 {
                             input = String::new();
-                            commands = command_trie.search_all(input.as_str()).clone();
+                            cursor = 0;
+                            commands = command_trie.search_all(input.as_str());
                             term.clear_line().unwrap();
                             term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                             continue;
@@ -180,13 +190,21 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                             
                         if found_command.len() > 0 {
                             input = found_command.clone();
+                            cursor = input.len();
                             term.clear_line().unwrap();
                             term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
                         }
-                    }
+                    },
+                    ArrowLeft => {
+                        cursor = if cursor > 0 { cursor - 1 } else { 0 };
+                    },
+                    ArrowRight => {
+                        cursor = if cursor < input.len() { cursor + 1 } else { input.len() };
+                    },
                     Char(c) => {
-                        input.push(c);
-                        commands = command_trie.search_all(input.as_str()).clone();
+                        input.insert(cursor, c);
+                        cursor += 1;
+                        commands = command_trie.search_all(input.as_str());
                         command_offset = 0;
                     },
                     _ => {
@@ -194,8 +212,11 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                     }
                 }
 
+                // TODO Clearing line is a little wonky 
+                // when input does not end with ;, it just moved everything to a new line
                 term.clear_line().unwrap();
                 term.write_str(format!("\r{PROMPT}{input}").as_str()).unwrap();
+                term.move_cursor_left(input.len() - cursor).unwrap();
             }
 
             println!();
@@ -223,6 +244,8 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
                 }
             }
         }
+
+        println!("Bye!");
     } else {
         let result = MySqlQueryResult::parse_query(mysql_args.execute.unwrap(), &mut connection).await;
         match result {

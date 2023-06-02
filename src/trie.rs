@@ -33,7 +33,7 @@ impl Trie {
         }
         let mut words = vec![];
         node.traverse(&mut words);
-        words
+        words.clone()
     }
 
     pub fn traverse(&self, words: &mut Vec<String>) {
