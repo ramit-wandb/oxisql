@@ -799,6 +799,7 @@ dependencies = [
  "chrono",
  "console",
  "futures",
+ "serde",
  "serde_json",
  "sqlx",
  "tokio",
