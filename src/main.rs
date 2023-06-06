@@ -1,8 +1,8 @@
-use std::{pin::Pin, future::Future};
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
 use console::Term;
 use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight};
+use clap::Parser;
 
 mod connector;
 use connector::MySqlQueryResult;
@@ -13,106 +13,60 @@ use formatter::print_table;
 mod trie;
 use trie::Trie;
 
-#[derive(Debug)]
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    version,
+    disable_help_flag(true)
+)]
 struct MySqlArgs {
+    #[arg(short, long)]
     host: String,
+
+    #[arg(short='P', long, default_value="3306")]
     port: u16,
+
+    #[arg(short, long)]
     user: String,
+
+    #[arg(short, long, default_value="")]
     password: String,
+
+    #[arg(short='D', long)]
     database: String,
+
+    #[arg(short, long)]
     execute: Option<String>
 }
 
-impl MySqlArgs {
-    fn new() -> MySqlArgs {
-        MySqlArgs { 
-            host: String::from(""), 
-            port: 0,
-            user: String::from(""),
-            password: String::from(""),
-            database: String::from(""),
-            execute: None
-        }
-    }
-
-    fn parse_args(args: Vec<String>) -> MySqlArgs {
-        let mut opts = MySqlArgs::new();
-
-        // TODO Parse args with clap
-        let mut i = 1;
-        while i < args.len() {
-            match args[i].as_str() {
-                "-h" | "--host" => {
-                    i += 1;
-                    opts.host = args[i].clone();
-                },
-                "-P" | "--port" => {
-                    i += 1;
-                    opts.port = args[i].parse::<u16>().expect("Invalid port");
-                },
-                "-u" | "--user" => {
-                    i += 1;
-                    opts.user = args[i].clone();
-                },
-                "-p" | "--password" => {
-                    i += 1;
-                    opts.password = args[i].clone();
-                },
-                "-D" | "--database" => {
-                    i += 1;
-                    opts.database = args[i].clone();
-                },
-                "-e" | "--execute" => {
-                    i += 1;
-                    opts.execute = Some(args[i].clone());
-                },
-                _ => {
-                    println!("Unknown argument: {}", args[i]);
-                }
-            }
-            i += 1;
-        }
-
-        opts
-    }
-}
-
-const HELP: &str = "Usage: oxisql -h <host> -P <port> -u <user> -p <password> -D <database> [-e <query>]";
-
 #[tokio::main]
 async fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 2 {
-        println!("{HELP}");
-        return;
+    let mut args: MySqlArgs = MySqlArgs::parse();
+    if args.password == "" {
+        args.password = rpassword::prompt_password("Password: ").expect("Could not read password");
+        println!();
+    } else {
+        eprintln!("[+] Warning: password is being passed as a command line argument, this is not secure")
     }
 
-    let mysql_args: MySqlArgs = MySqlArgs::parse_args(args);
-
-    if mysql_args.host == "" || mysql_args.port == 0 || mysql_args.user == "" || mysql_args.password == "" || mysql_args.database == "" {
-        println!("{HELP}");
-        return;
-    }
-
-    let connection : Pin<Box<dyn Future<Output = Result<MySqlConnection, sqlx::Error>>>> = MySqlConnection::connect(
+    let connection = MySqlConnection::connect(
         format!(
             "mysql://{}:{}@{}:{}/{}",
-            mysql_args.user,
-            mysql_args.password,
-            mysql_args.host,
-            mysql_args.port,
-            mysql_args.database
+            args.user,
+            args.password,
+            args.host,
+            args.port,
+            args.database
         ).as_str()
     ); 
     let connection : MySqlConnection = connection.await.expect("Could not connect to database");
 
-    run_mysql_session(connection, mysql_args).await;
+    run_mysql_session(connection, args).await;
 }
 
 
-async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArgs) {
-    let interactive = mysql_args.execute.is_none();
+async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
+    let interactive = args.execute.is_none();
     let mut command_trie = Trie::new();
 
     const PROMPT: &str = "oxisql> ";
@@ -242,7 +196,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, mysql_args: MySqlArg
 
         println!("Bye!");
     } else {
-        let result = MySqlQueryResult::parse_query(mysql_args.execute.unwrap(), &mut connection).await;
+        let result = MySqlQueryResult::parse_query(args.execute.unwrap(), &mut connection).await;
         match result {
             Ok(value) => {
                 print_table(&value)
