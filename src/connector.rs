@@ -61,16 +61,15 @@ impl MySqlResult {
     ) -> Result<MySqlResult, sqlx::Error> {
         let first_word = query.split_whitespace().next().unwrap_or("").to_uppercase();
 
-        if first_word.starts_with("INSERT")
-            || first_word.starts_with("UPDATE")
-            || first_word.starts_with("DELETE")
-        {
-            let affected_rows = sqlx::query(query.as_str()).execute(connection).await?;
-            let result = MySqlResult::RowsAffected(MySqlRowsAffected {
-                affected_rows: affected_rows.rows_affected(),
-            });
-
-            return Ok(result);
+        match first_word.as_str() {
+            "INSERT" | "UPDATE" | "DELETE" => {
+                let affected_rows = sqlx::query(query.as_str()).execute(connection).await?;
+                let result = MySqlResult::RowsAffected(MySqlRowsAffected {
+                    affected_rows: affected_rows.rows_affected(),
+                });
+                return Ok(result);
+            }
+            _ => {}
         }
 
         let mut result = MySqlTable::new();
