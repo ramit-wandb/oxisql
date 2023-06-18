@@ -15,8 +15,6 @@ const BOTTOM_T: &str = "┴";
 const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
-// TODO write!
-
 impl Display for MySqlTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut max_lengths = self.headers.iter().map(|s| s.len()).collect::<Vec<usize>>();
