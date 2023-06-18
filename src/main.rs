@@ -74,7 +74,7 @@ async fn main() {
 async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
     let trie_file_path: PathBuf = {
         let ref home = std::env::var("HOME").unwrap();
-        Path::new(home).join(".oxisql/commands_trie.json")
+        Path::new(home).join(".cache/oxisql/queries.trie.json")
     };
 
     let interactive = args.execute.is_none();
