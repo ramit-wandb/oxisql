@@ -4,6 +4,7 @@ mod trie;
 
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use console::Term;
 use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight};
 use clap::Parser;
@@ -69,14 +70,19 @@ async fn main() {
     }
 }
 
-const TRIE_FILE_PATH: &str = "~/.oxisql/trie.json";
+
 async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
+    let trie_file_path: PathBuf = {
+        let ref home = std::env::var("HOME").unwrap();
+        Path::new(home).join(".oxisql/commands_trie.json")
+    };
+
     let interactive = args.execute.is_none();
     const PROMPT: &str = "oxisql> ";
     let term : Term = Term::stdout();
 
     if interactive {
-        let mut command_trie = Trie::from_file(TRIE_FILE_PATH).unwrap_or(Trie::new());
+        let mut command_trie = Trie::from_file(trie_file_path.as_path()).unwrap_or(Trie::new());
 
         loop {
             print!("{PROMPT}");
@@ -199,7 +205,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             }
         }
 
-        command_trie.save(TRIE_FILE_PATH).unwrap();
+        command_trie.save(trie_file_path.as_path()).unwrap();
         println!("Bye!");
     } else {
         let result = MySqlQueryResult::parse_query(args.execute.unwrap(), &mut connection).await;

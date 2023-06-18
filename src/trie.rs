@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use std::fs::File;
+use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Trie {
@@ -16,7 +17,7 @@ impl Trie {
         }
     }
 
-    pub fn from_file(filename: &str) -> Option<Trie> {
+    pub fn from_file(filename: &Path) -> Option<Trie> {
         let file = File::open(filename);
         if let Ok(file) = file {
             let trie = serde_json::from_reader(file);
@@ -28,9 +29,9 @@ impl Trie {
         return None;
     }
 
-    pub fn save(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save(&self, filename: &Path) -> Result<(), Box<dyn std::error::Error>> {
         // create all parent directories
-        let _ = std::fs::create_dir_all(std::path::Path::new(filename).parent().unwrap());
+        std::fs::create_dir_all(filename.parent().unwrap());
         let file = File::create(filename).expect("Unable to create file");
         serde_json::to_writer(file, self).expect("Unable to write data");
         Ok(())
