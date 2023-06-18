@@ -9,9 +9,8 @@ use sqlx::{Connection, MySqlConnection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use trie::Trie;
-
 use crate::connector::{get_symbols, MySqlResult};
+use crate::trie::Trie;
 
 #[derive(Debug, Parser)]
 #[command(author, version, disable_help_flag(true))]

@@ -18,7 +18,7 @@ const RIGHT_T: &str = "┤";
 // TODO write!
 
 impl Display for MySqlTable {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut max_lengths = self.headers.iter().map(|s| s.len()).collect::<Vec<usize>>();
 
         for row in &self.values {
@@ -29,58 +29,57 @@ impl Display for MySqlTable {
         }
 
         // Top separator
-        print!("{TOP_LEFT}");
+        write!(f, "{TOP_LEFT}")?;
         for i in 0..max_lengths.len() {
             for _ in 0..max_lengths[i] + 2 {
-                print!("{HORIZONTAL}");
+                write!(f, "{HORIZONTAL}")?;
             }
             if i != max_lengths.len() - 1 {
-                print!("{TOP_T}");
+                write!(f, "{TOP_T}")?;
             }
         }
-        println!("{TOP_RIGHT}");
+        writeln!(f, "{TOP_RIGHT}")?;
 
         // Print headers
-        print!("{VERTICAL} ");
+        write!(f, "{VERTICAL} ")?;
         for (header, max_length) in self.headers.iter().zip(max_lengths.iter()) {
-            print!("{:>width$} {VERTICAL} ", header, width = max_length);
+            write!(f, "{:>width$} {VERTICAL} ", header, width = max_length)?;
         }
-        println!();
+        writeln!(f)?;
 
         // Header separator
-        print!("{LEFT_T}");
+        write!(f, "{LEFT_T}")?;
         for i in 0..max_lengths.len() {
             for _ in 0..max_lengths[i] + 2 {
-                print!("{HORIZONTAL}");
+                write!(f, "{HORIZONTAL}")?;
             }
             if i != max_lengths.len() - 1 {
-                print!("{CROSS}");
+                write!(f, "{CROSS}")?;
             }
         }
-        println!("{RIGHT_T}");
+        writeln!(f, "{RIGHT_T}")?;
 
         // Print rows
         for row in &self.values {
-            print!("{VERTICAL} ");
+            write!(f, "{VERTICAL} ")?;
             for (i, column_name) in self.headers.iter().enumerate() {
                 let column = row.get(column_name).unwrap();
-                print!("{:>width$} {VERTICAL} ", column, width = max_lengths[i]);
+                write!(f, "{:>width$} {VERTICAL} ", column, width = max_lengths[i])?;
             }
-            println!();
+            writeln!(f)?;
         }
 
         // Bottom separator
-        print!("{BOTTOM_LEFT}");
+        write!(f, "{BOTTOM_LEFT}")?;
         for i in 0..max_lengths.len() {
             for _ in 0..max_lengths[i] + 2 {
-                print!("{HORIZONTAL}");
+                write!(f, "{HORIZONTAL}")?;
             }
             if i != max_lengths.len() - 1 {
-                print!("{BOTTOM_T}");
+                write!(f, "{BOTTOM_T}")?;
             }
         }
-        println!("{BOTTOM_RIGHT}");
-        println!();
+        writeln!(f, "{BOTTOM_RIGHT}")?;
 
         Ok(())
     }
@@ -89,11 +88,11 @@ impl Display for MySqlTable {
 impl Display for MySqlRowsAffected {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.affected_rows == 0 {
-            write!(f, "No rows affected")
+            writeln!(f, "No rows affected")
         } else if self.affected_rows == 1 {
-            write!(f, "1 Row affected")
+            writeln!(f, "1 Row affected")
         } else {
-            write!(f, "{} Rows affected", self.affected_rows)
+            writeln!(f, "{} Rows affected", self.affected_rows)
         }
     }
 }
