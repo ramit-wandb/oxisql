@@ -242,10 +242,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             let result = MySqlResult::parse_query(input.to_string(), &mut connection).await;
 
             match result {
-                Ok(value) => match value {
-                    MySqlResult::Table(table) => print!("{}", table),
-                    _ => todo!("Implement printing of non-table results"),
-                },
+                Ok(value) => println!("{}", value),
                 Err(e) => {
                     eprintln!("Error: {}", e);
                 }
@@ -257,10 +254,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
     } else {
         let result = MySqlResult::parse_query(args.execute.unwrap(), &mut connection).await;
         match result {
-            Ok(output) => match output {
-                MySqlResult::Table(table) => print!("{}", table),
-                _ => todo!("Implement printing of non-table results"),
-            },
+            Ok(output) => println!("{}", output),
             Err(e) => {
                 eprintln!("Error: {}", e);
             }

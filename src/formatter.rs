@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::connector::MySqlTable;
+use crate::connector::{MySqlResult, MySqlRowsAffected, MySqlTable};
 
 const TOP_LEFT: &str = "┌";
 const TOP_RIGHT: &str = "┐";
@@ -14,6 +14,8 @@ const TOP_T: &str = "┬";
 const BOTTOM_T: &str = "┴";
 const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
+
+// TODO write!
 
 impl Display for MySqlTable {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,5 +83,21 @@ impl Display for MySqlTable {
         println!();
 
         Ok(())
+    }
+}
+
+impl Display for MySqlRowsAffected {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        print!("{} rows affected", self.affected_rows);
+        Ok(())
+    }
+}
+
+impl Display for MySqlResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MySqlResult::Table(table) => write!(f, "{}", table),
+            MySqlResult::RowsAffected(rows_affected) => write!(f, "{}", rows_affected),
+        }
     }
 }
