@@ -87,16 +87,14 @@ impl Display for MySqlTable {
 }
 
 impl Display for MySqlRowsAffected {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.affected_rows == 0 {
-            println!("No rows affected");
-            return Ok(());
+            write!(f, "No rows affected")
         } else if self.affected_rows == 1 {
-            println!("1 Row affected");
-            return Ok(());
+            write!(f, "1 Row affected")
+        } else {
+            write!(f, "{} Rows affected", self.affected_rows)
         }
-        print!("{} Rows affected", self.affected_rows);
-        Ok(())
     }
 }
 
