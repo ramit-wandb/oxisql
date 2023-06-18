@@ -85,8 +85,7 @@ impl MySqlResult {
         for row in rows {
             let mut row_values = HashMap::new();
             for column in row.columns() {
-                let column_idx = column.name(); // ordinal() will fix the show full processlist
-                                                // bug, but better to fix it within mysql itself
+                let column_idx = column.ordinal();
                 let value_str = match column.type_info().name() {
                     "BOOLEAN" => handle_result::<bool>(row.try_get(column_idx)),
                     "TINYINT" => handle_result::<i8>(row.try_get(column_idx)),
@@ -117,7 +116,7 @@ impl MySqlResult {
                     "JSON" => handle_result::<serde_json::Value>(row.try_get(column_idx)),
                     _ => "NULL".to_string(),
                 };
-                row_values.insert(column_idx.to_string(), value_str);
+                row_values.insert(column.name().to_string(), value_str);
             }
             result.values.push(row_values);
         }
