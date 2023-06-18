@@ -84,6 +84,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
     let term : Term = Term::stdout();
 
     let mut symbols_trie : Trie = Trie::new();
+    println!("[+] Loading Symbols from Database");
     let symbols = get_symbols(&mut connection).await;
     match symbols {
         Ok(symbols) => {
@@ -181,15 +182,14 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
                     },
                     Tab => {
                         // Copy string till last space or start of string
-                        let mut word = String::new();
-                        for c in input[..cursor].chars().rev() {
-                            if c == ' ' {
-                                break;
-                            }
-                            word.push(c);
-                        }
-                        word = word.chars().rev().collect();
-                        dbg!(&word);
+                        let word = input[..cursor]
+                            .chars()
+                            .rev()
+                            .take_while(|c| *c != ' ')
+                            .collect::<String>()
+                            .chars()
+                            .rev()
+                            .collect::<String>();
 
                         let valid_symbols = symbols_trie.search_all(word.as_str());
                         if valid_symbols.len() == 0 {
@@ -197,7 +197,8 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
                         }
 
                         if last_matched_word == word {
-                            input = input.replace(word.as_str(), valid_symbols.get(match_index).unwrap().as_str());
+                            // Concatenate matched symbol to input
+                            input = input[..cursor - word.len()].to_string() + valid_symbols.get(match_index).unwrap();
                             match_index = (match_index + 1) % valid_symbols.len();
                         } else {
                             match_index = 0;
