@@ -79,7 +79,7 @@ impl Display for MySqlTable {
                 write!(f, "{BOTTOM_T}")?;
             }
         }
-        writeln!(f, "{BOTTOM_RIGHT}")?;
+        write!(f, "{BOTTOM_RIGHT}")?;
 
         Ok(())
     }
@@ -88,11 +88,11 @@ impl Display for MySqlTable {
 impl Display for MySqlRowsAffected {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.affected_rows == 0 {
-            writeln!(f, "No rows affected")
+            write!(f, "No rows affected")
         } else if self.affected_rows == 1 {
-            writeln!(f, "1 Row affected")
+            write!(f, "1 Row affected")
         } else {
-            writeln!(f, "{} Rows affected", self.affected_rows)
+            write!(f, "{} Rows affected", self.affected_rows)
         }
     }
 }

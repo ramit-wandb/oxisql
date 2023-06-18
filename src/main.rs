@@ -8,6 +8,7 @@ use console::Term;
 use sqlx::{Connection, MySqlConnection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use crate::connector::{get_symbols, MySqlResult};
 use crate::trie::Trie;
@@ -238,10 +239,18 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             }
 
             command_trie.insert(input.clone());
+            let start_time = Instant::now();
             let result = MySqlResult::parse_query(input.to_string(), &mut connection).await;
+            let end_time = Instant::now();
 
             match result {
-                Ok(value) => println!("{}", value),
+                Ok(value) => {
+                    println!("{}", value);
+                    println!(
+                        "Elapsed time: {}ms",
+                        end_time.duration_since(start_time).as_millis()
+                    );
+                }
                 Err(e) => {
                     eprintln!("Error: {}", e);
                 }
@@ -251,9 +260,17 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
         command_trie.save(trie_file_path.as_path()).unwrap();
         println!("Bye!");
     } else {
+        let start_time = Instant::now();
         let result = MySqlResult::parse_query(args.execute.unwrap(), &mut connection).await;
+        let end_time = Instant::now();
         match result {
-            Ok(output) => println!("{}", output),
+            Ok(output) => {
+                println!("{}", output);
+                println!(
+                    "Elapsed time: {}ms",
+                    end_time.duration_since(start_time).as_millis()
+                );
+            }
             Err(e) => {
                 eprintln!("Error: {}", e);
             }
