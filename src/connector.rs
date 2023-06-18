@@ -61,7 +61,7 @@ impl MySqlResult {
         let first_word = query.split_whitespace().next().unwrap_or("").to_uppercase();
 
         match first_word.as_str() {
-            "INSERT" | "UPDATE" | "DELETE" => {
+            "INSERT" | "UPDATE" | "DELETE" | "REPLACE" => {
                 let affected_rows = sqlx::query(query.as_str()).execute(connection).await?;
                 let result = MySqlResult::RowsAffected(MySqlRowsAffected {
                     affected_rows: affected_rows.rows_affected(),
