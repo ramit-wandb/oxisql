@@ -1,16 +1,15 @@
+mod connector;
+mod formatter;
+mod trie;
+
 use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
 use console::Term;
 use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight};
 use clap::Parser;
 
-mod connector;
 use connector::MySqlQueryResult;
-
-mod formatter;
 use formatter::print_table;
-
-mod trie;
 use trie::Trie;
 
 #[derive(Debug, Parser)]
@@ -44,9 +43,8 @@ async fn main() {
     let mut args: MySqlArgs = MySqlArgs::parse();
     if args.password == "" {
         args.password = rpassword::prompt_password("Password: ").expect("Could not read password");
-        println!();
     } else {
-        eprintln!("[+] Warning: password is being passed as a command line argument, this is not secure")
+        eprintln!("[!] Warning: password is being passed as a command line argument, this is not secure")
     }
 
     let connection = MySqlConnection::connect(
@@ -58,21 +56,28 @@ async fn main() {
             args.port,
             args.database
         ).as_str()
-    ); 
-    let connection : MySqlConnection = connection.await.expect("Could not connect to database");
+    ).await;
 
-    run_mysql_session(connection, args).await;
+    match connection {
+        Ok(connection) => {
+            println!("[+] Connected to MySQL server");
+            run_mysql_session(connection, args).await;
+        },
+        Err(e) => {
+            eprintln!("[-] Could not connect to MySQL server: {}", e);
+        }
+    }
 }
 
-
+const TRIE_FILE_PATH: &str = "~/.oxisql/trie.json";
 async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
     let interactive = args.execute.is_none();
-    let mut command_trie = Trie::new();
-
     const PROMPT: &str = "oxisql> ";
     let term : Term = Term::stdout();
 
     if interactive {
+        let mut command_trie = Trie::from_file(TRIE_FILE_PATH).unwrap_or(Trie::new());
+
         loop {
             print!("{PROMPT}");
             std::io::stdout().flush().unwrap();
@@ -194,6 +199,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             }
         }
 
+        command_trie.save(TRIE_FILE_PATH).unwrap();
         println!("Bye!");
     } else {
         let result = MySqlQueryResult::parse_query(args.execute.unwrap(), &mut connection).await;
