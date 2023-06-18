@@ -17,6 +17,14 @@ impl Trie {
         }
     }
 
+    pub fn from_vec(words: Vec<String>) -> Trie {
+        let mut trie = Trie::new();
+        for word in words {
+            trie.insert(&word);
+        }
+        trie
+    }
+
     pub fn from_file(filename: &Path) -> Option<Trie> {
         let file = File::open(filename);
         if let Ok(file) = file {

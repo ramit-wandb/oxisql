@@ -9,6 +9,15 @@ pub struct MySqlQueryResult {
     pub values: Vec<HashMap<String, String>>
 }
 
+pub async fn get_symbols(connection: &mut MySqlConnection) -> Result<Vec<String>, sqlx::Error> {
+    let mut symbols = Vec::new();
+    let rows = sqlx::query("SHOW TABLES").fetch_all(connection).await?;
+    for row in rows {
+        symbols.push(row.try_get::<String, _>(0)?);
+    }
+    Ok(symbols)
+}
+
 fn handle_result<T>(value: Result<Option<T>, sqlx::Error>) -> String where T: ToString + sqlx::Type<MySql> {
     match value {
         Ok(value) => match value {

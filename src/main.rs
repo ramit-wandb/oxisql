@@ -6,12 +6,14 @@ use sqlx::{MySqlConnection, Connection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use console::Term;
-use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight};
+use console::Key::{Char, Backspace, Enter, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Tab};
 use clap::Parser;
 
 use connector::MySqlQueryResult;
 use formatter::print_table;
 use trie::Trie;
+
+use crate::connector::get_symbols;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -76,10 +78,22 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
         let ref home = std::env::var("HOME").unwrap();
         Path::new(home).join(".cache/oxisql/queries.trie.json")
     };
-
     let interactive = args.execute.is_none();
+
     const PROMPT: &str = "oxisql> ";
     let term : Term = Term::stdout();
+
+    let mut symbols_trie : Trie = Trie::new();
+    let symbols = get_symbols(&mut connection).await;
+    match symbols {
+        Ok(symbols) => {
+            symbols_trie = Trie::from_vec(symbols);
+        },
+        Err(e) => {
+            eprintln!("[-] Could not get symbols: {}", e);
+        }
+    }
+
 
     if interactive {
         let mut command_trie = Trie::from_file(trie_file_path.as_path()).unwrap_or(Trie::new());
@@ -93,6 +107,8 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             let mut command_offset : usize = 0;
             let mut commands : Vec<String> = command_trie.search_all(input.as_str());
             let mut cursor : usize = 0;
+            let mut last_matched_word : String = String::new();
+            let mut match_index : usize = 0;
 
             loop {
                 pressed_key = term.read_key().unwrap();
@@ -162,6 +178,32 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
                     },
                     ArrowRight => {
                         cursor = if cursor < input.len() { cursor + 1 } else { input.len() };
+                    },
+                    Tab => {
+                        // Copy string till last space or start of string
+                        let mut word = String::new();
+                        for c in input[..cursor].chars().rev() {
+                            if c == ' ' {
+                                break;
+                            }
+                            word.push(c);
+                        }
+                        word = word.chars().rev().collect();
+                        dbg!(&word);
+
+                        let valid_symbols = symbols_trie.search_all(word.as_str());
+                        if valid_symbols.len() == 0 {
+                            continue;
+                        }
+
+                        if last_matched_word == word {
+                            input = input.replace(word.as_str(), valid_symbols.get(match_index).unwrap().as_str());
+                            match_index = (match_index + 1) % valid_symbols.len();
+                        } else {
+                            match_index = 0;
+                        }
+
+                        last_matched_word = word.clone();
                     },
                     Char(c) => {
                         input.insert(cursor, c);
