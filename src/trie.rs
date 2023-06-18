@@ -31,7 +31,7 @@ impl Trie {
 
     pub fn save(&self, filename: &Path) -> Result<(), Box<dyn std::error::Error>> {
         // create all parent directories
-        std::fs::create_dir_all(filename.parent().unwrap());
+        std::fs::create_dir_all(filename.parent().unwrap())?;
         let file = File::create(filename).expect("Unable to create file");
         serde_json::to_writer(file, self).expect("Unable to write data");
         Ok(())
