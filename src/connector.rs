@@ -1,5 +1,4 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use sqlx::mysql::MySqlColumn;
 use sqlx::{Column, MySql, MySqlConnection, Row, TypeInfo};
 use std::collections::HashMap;
 
@@ -58,7 +57,7 @@ impl MySqlResult {
     pub async fn parse_query(
         query: String,
         connection: &mut MySqlConnection,
-    ) -> Result<MySqlResult, sqlx::Error> {
+    ) -> Result<Self, sqlx::Error> {
         let first_word = query.split_whitespace().next().unwrap_or("").to_uppercase();
 
         match first_word.as_str() {
@@ -86,10 +85,9 @@ impl MySqlResult {
         for row in rows {
             let mut row_values = HashMap::new();
             for column in row.columns() {
-                let value: &MySqlColumn = column.into();
                 let column_idx = column.name(); // ordinal() will fix the show full processlist
                                                 // bug, but better to fix it within mysql itself
-                let value_str = match value.type_info().name() {
+                let value_str = match column.type_info().name() {
                     "BOOLEAN" => handle_result::<bool>(row.try_get(column_idx)),
                     "TINYINT" => handle_result::<i8>(row.try_get(column_idx)),
                     "SMALLINT" => handle_result::<i16>(row.try_get(column_idx)),

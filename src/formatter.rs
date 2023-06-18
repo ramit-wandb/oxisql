@@ -17,6 +17,11 @@ const RIGHT_T: &str = "┤";
 
 impl Display for MySqlTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.values.is_empty() {
+            write!(f, "Empty set")?;
+            return Ok(());
+        }
+
         let mut max_lengths = self.headers.iter().map(|s| s.len()).collect::<Vec<usize>>();
 
         for row in &self.values {
@@ -77,7 +82,13 @@ impl Display for MySqlTable {
                 write!(f, "{BOTTOM_T}")?;
             }
         }
-        write!(f, "{BOTTOM_RIGHT}")?;
+        writeln!(f, "{BOTTOM_RIGHT}")?;
+        write!(
+            f,
+            "{} row{} in set",
+            self.values.len(),
+            if self.values.len() == 1 { "" } else { "s" }
+        )?;
 
         Ok(())
     }
