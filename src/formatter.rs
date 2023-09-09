@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::connector::{MySqlResult, MySqlRowsAffected, MySqlTable};
+use crate::connector::{MySqlOutputTable, MySqlResult, MySqlRowsAffected};
 
 const TOP_LEFT: &str = "┌";
 const TOP_RIGHT: &str = "┐";
@@ -15,7 +15,7 @@ const BOTTOM_T: &str = "┴";
 const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
-impl Display for MySqlTable {
+impl Display for MySqlOutputTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.values.is_empty() {
             write!(f, "Empty set")?;
