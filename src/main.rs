@@ -1,10 +1,12 @@
 mod connector;
 mod formatter;
+mod query;
 mod trie;
 
 use clap::Parser;
 use console::Key::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Backspace, Char, Enter, Tab};
 use console::Term;
+use query::Query;
 use sqlx::{Connection, MySqlConnection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -104,9 +106,11 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
             let mut cursor: usize = 0;
             let mut last_matched_word: String = String::new();
             let mut match_index: usize = 0;
+            let mut query = Query::new();
 
             loop {
                 pressed_key = term.read_key().unwrap();
+                let (terminal_rows, terminal_cols) = term.size();
 
                 match pressed_key {
                     Backspace => {
@@ -118,9 +122,6 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
                                 .unwrap();
                         }
                         commands = command_trie.search_all(input.as_str());
-                        term.clear_line().unwrap();
-                        term.write_str(format!("\r{PROMPT}{input}").as_str())
-                            .unwrap();
                     }
                     Enter => {
                         if input.chars().last() == Some(';') {
