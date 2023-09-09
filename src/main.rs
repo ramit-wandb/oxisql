@@ -10,6 +10,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use std::sync::{Arc, Mutex};
+
 use crate::connector::{get_symbols, MySqlResult};
 use crate::trie::Trie;
 
@@ -58,7 +60,7 @@ async fn main() {
     match connection {
         Ok(connection) => {
             println!("[+] Connected to MySQL server");
-            run_mysql_session(connection, args).await;
+            run_mysql_session(Arc::new(Mutex::new(connection)), args).await;
         }
         Err(e) => {
             eprintln!("[-] Could not connect to MySQL server: {}", e);
@@ -66,7 +68,7 @@ async fn main() {
     }
 }
 
-async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
+async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlArgs) {
     let trie_file_path: PathBuf = {
         let ref home = std::env::var("HOME").unwrap();
         Path::new(home).join(".cache/oxisql/queries.trie.json")
@@ -78,7 +80,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
 
     let mut symbols_trie: Trie = Trie::new();
     println!("[+] Loading Symbols from Database");
-    let symbols = get_symbols(&mut connection).await;
+    let symbols = get_symbols(connection.clone()).await;
     match symbols {
         Ok(symbols) => {
             symbols_trie = Trie::from_vec(symbols);
@@ -240,7 +242,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
 
             command_trie.insert(input.clone());
             let start_time = Instant::now();
-            let result = MySqlResult::parse_query(input.to_string(), &mut connection).await;
+            let result = MySqlResult::parse_query(input.to_string(), connection.clone()).await;
             let end_time = Instant::now();
 
             match result {
@@ -261,7 +263,7 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
         println!("Bye!");
     } else {
         let start_time = Instant::now();
-        let result = MySqlResult::parse_query(args.execute.unwrap(), &mut connection).await;
+        let result = MySqlResult::parse_query(args.execute.unwrap(), connection.clone()).await;
         let end_time = Instant::now();
         match result {
             Ok(output) => {
@@ -276,9 +278,4 @@ async fn run_mysql_session(mut connection: MySqlConnection, args: MySqlArgs) {
             }
         }
     }
-
-    connection
-        .close()
-        .await
-        .expect("Could not close connection");
 }
