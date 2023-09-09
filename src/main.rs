@@ -210,6 +210,12 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
 
                         last_matched_word = word.clone();
                     }
+                    Char('\u{4}') => {
+                        // ctrl-d
+                        if input.len() == 0 {
+                            return;
+                        }
+                    }
                     Char(c) => {
                         input.insert(cursor, c);
                         cursor += 1;
