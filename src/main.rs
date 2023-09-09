@@ -116,112 +116,113 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
                     Backspace => {
                         if cursor > 0 {
                             cursor -= 1;
-                            input.remove(cursor);
+                            query.handle_backspace(cursor);
                             term.clear_line().unwrap();
                             term.write_str(format!("\r{PROMPT}{input}").as_str())
                                 .unwrap();
                         }
-                        commands = command_trie.search_all(input.as_str());
+                        //commands = command_trie.search_all(input.as_str());
                     }
                     Enter => {
-                        if input.chars().last() == Some(';') {
+                        if query.chars().last() == Some(';') {
                             break;
                         }
+                        query.handle_enter();
                     }
-                    ArrowUp => {
-                        if commands.len() == 0 {
-                            continue;
-                        }
-                        if command_offset != commands.len() {
-                            command_offset += 1;
-                        }
+                    //ArrowUp => {
+                    //if commands.len() == 0 {
+                    //continue;
+                    //}
+                    //if command_offset != commands.len() {
+                    //command_offset += 1;
+                    //}
 
-                        let found_command = commands.get(commands.len() - command_offset).unwrap();
+                    //let found_command = commands.get(commands.len() - command_offset).unwrap();
 
-                        if found_command.len() > 0 {
-                            input = found_command.clone();
-                            cursor = input.len();
-                            term.clear_line().unwrap();
-                            term.write_str(format!("\r{PROMPT}{input}").as_str())
-                                .unwrap();
-                        }
-                    }
-                    ArrowDown => {
-                        if commands.len() == 0 {
-                            continue;
-                        }
-                        if command_offset >= 1 {
-                            command_offset -= 1;
-                        }
+                    //if found_command.len() > 0 {
+                    //input = found_command.clone();
+                    //cursor = input.len();
+                    //term.clear_line().unwrap();
+                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
+                    //.unwrap();
+                    //}
+                    //}
+                    //ArrowDown => {
+                    //if commands.len() == 0 {
+                    //continue;
+                    //}
+                    //if command_offset >= 1 {
+                    //command_offset -= 1;
+                    //}
 
-                        if command_offset == 0 {
-                            input = String::new();
-                            cursor = 0;
-                            commands = command_trie.search_all(input.as_str());
-                            term.clear_line().unwrap();
-                            term.write_str(format!("\r{PROMPT}{input}").as_str())
-                                .unwrap();
-                            continue;
-                        }
+                    //if command_offset == 0 {
+                    //input = String::new();
+                    //cursor = 0;
+                    //commands = command_trie.search_all(input.as_str());
+                    //term.clear_line().unwrap();
+                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
+                    //.unwrap();
+                    //continue;
+                    //}
 
-                        let found_command = commands.get(commands.len() - command_offset).unwrap();
+                    //let found_command = commands.get(commands.len() - command_offset).unwrap();
 
-                        if found_command.len() > 0 {
-                            input = found_command.clone();
-                            cursor = input.len();
-                            term.clear_line().unwrap();
-                            term.write_str(format!("\r{PROMPT}{input}").as_str())
-                                .unwrap();
-                        }
-                    }
-                    ArrowLeft => {
-                        cursor = if cursor > 0 { cursor - 1 } else { 0 };
-                    }
-                    ArrowRight => {
-                        cursor = if cursor < input.len() {
-                            cursor + 1
-                        } else {
-                            input.len()
-                        };
-                    }
-                    Tab => {
-                        // Copy string till last space or start of string
-                        let word = input[..cursor]
-                            .chars()
-                            .rev()
-                            .take_while(|c| *c != ' ')
-                            .collect::<String>()
-                            .chars()
-                            .rev()
-                            .collect::<String>();
+                    //if found_command.len() > 0 {
+                    //input = found_command.clone();
+                    //cursor = input.len();
+                    //term.clear_line().unwrap();
+                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
+                    //.unwrap();
+                    //}
+                    //}
+                    //ArrowLeft => {
+                    //cursor = if cursor > 0 { cursor - 1 } else { 0 };
+                    //}
+                    //ArrowRight => {
+                    //cursor = if cursor < input.len() {
+                    //cursor + 1
+                    //} else {
+                    //input.len()
+                    //};
+                    //}
+                    //Tab => {
+                    //// Copy string till last space or start of string
+                    //let word = input[..cursor]
+                    //.chars()
+                    //.rev()
+                    //.take_while(|c| *c != ' ')
+                    //.collect::<String>()
+                    //.chars()
+                    //.rev()
+                    //.collect::<String>();
 
-                        let valid_symbols = symbols_trie.search_all(word.as_str());
-                        if valid_symbols.len() == 0 {
-                            continue;
-                        }
+                    //let valid_symbols = symbols_trie.search_all(word.as_str());
+                    //if valid_symbols.len() == 0 {
+                    //continue;
+                    //}
 
-                        if last_matched_word == word {
-                            // Concatenate matched symbol to input
-                            input = input[..cursor - word.len()].to_string()
-                                + valid_symbols.get(match_index).unwrap();
-                            match_index = (match_index + 1) % valid_symbols.len();
-                        } else {
-                            match_index = 0;
-                        }
+                    //if last_matched_word == word {
+                    //// Concatenate matched symbol to input
+                    //input = input[..cursor - word.len()].to_string()
+                    //+ valid_symbols.get(match_index).unwrap();
+                    //match_index = (match_index + 1) % valid_symbols.len();
+                    //} else {
+                    //match_index = 0;
+                    //}
 
-                        last_matched_word = word.clone();
-                    }
-                    Char('\u{4}') => {
-                        // ctrl-d
-                        if input.len() == 0 {
-                            return;
-                        }
-                    }
+                    //last_matched_word = word.clone();
+                    //}
+                    //Char('\u{4}') => {
+                    //// ctrl-d
+                    //if input.len() == 0 {
+                    //return;
+                    //}
+                    //}
                     Char(c) => {
-                        input.insert(cursor, c);
+                        query.handle_char(cursor, c);
                         cursor += 1;
-                        commands = command_trie.search_all(input.as_str());
-                        command_offset = 0;
+                        //commands = command_trie.search_all(query.as_str());
+                        //command_offset = 0;
                     }
                     _ => {
                         eprintln!("Unknown key: {:?}", pressed_key);
@@ -229,27 +230,27 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
                 }
 
                 term.clear_line().unwrap();
-                term.write_str(format!("\r{PROMPT}{input}").as_str())
+                term.write_str(format!("\r{PROMPT}{query}").as_str())
                     .unwrap();
-                term.move_cursor_left(input.len() - cursor).unwrap();
+                term.move_cursor_left(query.len() - cursor).unwrap();
             }
 
             println!();
 
-            let input = input.trim();
-            if input == "exit;" || input == "quit;" {
+            if query.as_str() == "exit;" || query.as_str() == "quit;" {
                 break;
             }
 
-            if input == "clear;" {
+            if query.as_str() == "clear;" {
                 let mut stdout = std::io::stdout();
                 stdout.write("\x1B[2J\x1B[1;1H".as_bytes()).unwrap();
                 continue;
             }
 
-            command_trie.insert(input.clone());
+            command_trie.insert(query.as_str().clone());
             let start_time = Instant::now();
-            let result = MySqlResult::parse_query(input.to_string(), connection.clone()).await;
+            let result =
+                MySqlResult::parse_query(query.as_str().to_string(), connection.clone()).await;
             let end_time = Instant::now();
 
             match result {

@@ -13,22 +13,22 @@ impl Query {
         }
     }
 
-    pub fn handle_char(&mut self, c: char) {
-        self.visible_query.push(c);
-        self.real_query.push(c);
+    pub fn handle_char(&mut self, cursor_position: usize, c: char) {
+        self.visible_query.insert(cursor_position, c);
+        self.real_query.insert(cursor_position, c);
     }
 
     pub fn handle_enter(&mut self) {
         self.visible_query.push('\n');
     }
 
-    pub fn handle_backspace(&mut self) {
+    pub fn handle_backspace(&mut self, cursor_position: usize) {
         if self.visible_query.is_empty() {
             return;
         }
 
-        self.visible_query.pop();
-        self.real_query.pop();
+        self.visible_query.remove(cursor_position);
+        self.real_query.remove(cursor_position);
     }
 
     pub fn set_query(&mut self, query: String) {
@@ -39,6 +39,18 @@ impl Query {
     pub fn clear(&mut self) {
         self.visible_query.clear();
         self.real_query.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.visible_query.len()
+    }
+
+    pub fn chars(&self) -> std::str::Chars<'_> {
+        self.visible_query.chars()
+    }
+
+    pub fn as_str(&self) -> &str {
+        self.real_query.as_str()
     }
 }
 
