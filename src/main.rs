@@ -6,7 +6,7 @@ mod trie;
 use clap::Parser;
 use console::Key::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Backspace, Char, Enter, Tab};
 use console::Term;
-use query::Query;
+use query::{Query, PROMPT};
 use sqlx::{Connection, MySqlConnection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -77,7 +77,6 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
     };
     let interactive = args.execute.is_none();
 
-    const PROMPT: &str = "oxisql> ";
     let term: Term = Term::stdout();
 
     let mut symbols_trie: Trie = Trie::new();
@@ -212,12 +211,12 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
 
                     //last_matched_word = word.clone();
                     //}
-                    //Char('\u{4}') => {
-                    //// ctrl-d
-                    //if input.len() == 0 {
-                    //return;
-                    //}
-                    //}
+                    Char('\u{4}') => {
+                        // ctrl-d
+                        if query.len() == 0 {
+                            return;
+                        }
+                    }
                     Char(c) => {
                         query.handle_char(cursor, c);
                         cursor += 1;

@@ -5,6 +5,8 @@ pub struct Query {
     pub real_query: String,
 }
 
+pub const PROMPT: &str = "oxisql>";
+
 impl Query {
     pub fn new() -> Self {
         Self {
