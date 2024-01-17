@@ -2,11 +2,11 @@ mod connector;
 mod formatter;
 mod query;
 mod trie;
+mod ui;
 
 use clap::Parser;
-use console::Key::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Backspace, Char, Enter, Tab};
 use console::Term;
-use query::{Query, PROMPT};
+use query::PROMPT;
 use sqlx::{Connection, MySqlConnection};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -71,170 +71,36 @@ async fn main() {
 }
 
 async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlArgs) {
-    let trie_file_path: PathBuf = {
-        let ref home = std::env::var("HOME").unwrap();
-        Path::new(home).join(".cache/oxisql/queries.trie.json")
-    };
     let interactive = args.execute.is_none();
 
-    let term: Term = Term::stdout();
-
-    let mut symbols_trie: Trie = Trie::new();
-    println!("[+] Loading Symbols from Database");
-    let symbols = get_symbols(connection.clone()).await;
-    match symbols {
-        Ok(symbols) => {
-            symbols_trie = Trie::from_vec(symbols);
-        }
-        Err(e) => {
-            eprintln!("[-] Could not get symbols: {}", e);
-        }
-    }
-
     if interactive {
-        let mut command_trie = Trie::from_file(trie_file_path.as_path()).unwrap_or(Trie::new());
+        let term: Term = Term::stdout();
+        let mut symbols_trie: Trie = Trie::new();
+        println!("[+] Loading Symbols from Database");
+        let symbols = get_symbols(connection.clone()).await;
+        match symbols {
+            Ok(symbols) => {
+                symbols_trie = Trie::from_vec(symbols);
+            }
+            Err(e) => {
+                eprintln!("[-] Could not get symbols: {}", e);
+            }
+        }
+        let trie_file_path: PathBuf = {
+            let ref home = std::env::var("HOME").unwrap();
+            Path::new(home).join(".cache/oxisql/queries.trie.json")
+        };
+        let commands_trie = Trie::from_file(trie_file_path.as_path()).unwrap_or(Trie::new());
+
+        let mut session = ui::Session::new(term, commands_trie, symbols_trie);
 
         loop {
             print!("{PROMPT}");
             std::io::stdout().flush().unwrap();
 
-            let mut pressed_key: console::Key;
-            let mut input = String::new();
-            let mut command_offset: usize = 0;
-            let mut commands: Vec<String> = command_trie.search_all(input.as_str());
-            let mut cursor: usize = 0;
-            let mut last_matched_word: String = String::new();
-            let mut match_index: usize = 0;
-            let mut query = Query::new();
-
-            loop {
-                pressed_key = term.read_key().unwrap();
-                let (terminal_rows, terminal_cols) = term.size();
-
-                match pressed_key {
-                    Backspace => {
-                        if cursor > 0 {
-                            cursor -= 1;
-                            query.handle_backspace(cursor);
-                            term.clear_line().unwrap();
-                            term.write_str(format!("\r{PROMPT}{input}").as_str())
-                                .unwrap();
-                        }
-                        //commands = command_trie.search_all(input.as_str());
-                    }
-                    Enter => {
-                        if query.chars().last() == Some(';') {
-                            break;
-                        }
-                        query.handle_enter();
-                    }
-                    //ArrowUp => {
-                    //if commands.len() == 0 {
-                    //continue;
-                    //}
-                    //if command_offset != commands.len() {
-                    //command_offset += 1;
-                    //}
-
-                    //let found_command = commands.get(commands.len() - command_offset).unwrap();
-
-                    //if found_command.len() > 0 {
-                    //input = found_command.clone();
-                    //cursor = input.len();
-                    //term.clear_line().unwrap();
-                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
-                    //.unwrap();
-                    //}
-                    //}
-                    //ArrowDown => {
-                    //if commands.len() == 0 {
-                    //continue;
-                    //}
-                    //if command_offset >= 1 {
-                    //command_offset -= 1;
-                    //}
-
-                    //if command_offset == 0 {
-                    //input = String::new();
-                    //cursor = 0;
-                    //commands = command_trie.search_all(input.as_str());
-                    //term.clear_line().unwrap();
-                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
-                    //.unwrap();
-                    //continue;
-                    //}
-
-                    //let found_command = commands.get(commands.len() - command_offset).unwrap();
-
-                    //if found_command.len() > 0 {
-                    //input = found_command.clone();
-                    //cursor = input.len();
-                    //term.clear_line().unwrap();
-                    //term.write_str(format!("\r{PROMPT}{input}").as_str())
-                    //.unwrap();
-                    //}
-                    //}
-                    //ArrowLeft => {
-                    //cursor = if cursor > 0 { cursor - 1 } else { 0 };
-                    //}
-                    //ArrowRight => {
-                    //cursor = if cursor < input.len() {
-                    //cursor + 1
-                    //} else {
-                    //input.len()
-                    //};
-                    //}
-                    //Tab => {
-                    //// Copy string till last space or start of string
-                    //let word = input[..cursor]
-                    //.chars()
-                    //.rev()
-                    //.take_while(|c| *c != ' ')
-                    //.collect::<String>()
-                    //.chars()
-                    //.rev()
-                    //.collect::<String>();
-
-                    //let valid_symbols = symbols_trie.search_all(word.as_str());
-                    //if valid_symbols.len() == 0 {
-                    //continue;
-                    //}
-
-                    //if last_matched_word == word {
-                    //// Concatenate matched symbol to input
-                    //input = input[..cursor - word.len()].to_string()
-                    //+ valid_symbols.get(match_index).unwrap();
-                    //match_index = (match_index + 1) % valid_symbols.len();
-                    //} else {
-                    //match_index = 0;
-                    //}
-
-                    //last_matched_word = word.clone();
-                    //}
-                    Char('\u{4}') => {
-                        // ctrl-d
-                        if query.len() == 0 {
-                            return;
-                        }
-                    }
-                    Char(c) => {
-                        query.handle_char(cursor, c);
-                        cursor += 1;
-                        //commands = command_trie.search_all(query.as_str());
-                        //command_offset = 0;
-                    }
-                    _ => {
-                        eprintln!("Unknown key: {:?}", pressed_key);
-                    }
-                }
-
-                term.clear_line().unwrap();
-                term.write_str(format!("\r{PROMPT}{query}").as_str())
-                    .unwrap();
-                term.move_cursor_left(query.len() - cursor).unwrap();
-            }
-
             println!();
+
+            let query = session.get_user_input();
 
             if query.as_str() == "exit;" || query.as_str() == "quit;" {
                 break;
@@ -246,7 +112,7 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
                 continue;
             }
 
-            command_trie.insert(query.as_str().clone());
+            session.commands_trie.insert(query.as_str());
             let start_time = Instant::now();
             let result =
                 MySqlResult::parse_query(query.as_str().to_string(), connection.clone()).await;
@@ -266,7 +132,10 @@ async fn run_mysql_session(connection: Arc<Mutex<MySqlConnection>>, args: MySqlA
             }
         }
 
-        command_trie.save(trie_file_path.as_path()).unwrap();
+        session
+            .commands_trie
+            .save(trie_file_path.as_path())
+            .unwrap();
         println!("Bye!");
     } else {
         let start_time = Instant::now();
